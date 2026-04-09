@@ -9,6 +9,6 @@ const firebaseConfig = {
   projectId: "kometaro-x",
   storageBucket: "kometaro-x.firebasestorage.app",
   messagingSenderId: "889271140667",
-  appId: "1:889271140667:web:afb18a2533cd21c309371e",
-  measurementId: "G-LW6H2HL6CM"
+  appId: "1:889271140667:web:83bbdcbe5af10d5509371e",
+  measurementId: "G-YN7KT387WF"
 };
