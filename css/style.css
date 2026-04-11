@@ -112,6 +112,16 @@ html, body {
   outline: none;
   border-color: #FF6934;
 }
+.btn-forgot {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 13px;
+  margin-top: 8px;
+  cursor: pointer;
+  text-decoration: underline;
+  width: 100%;
+}
 .auth-error {
   color: #FF3B30;
   font-size: 13px;

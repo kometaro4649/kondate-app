@@ -107,12 +107,23 @@ const App = {
     return null;
   },
 
+  async sendPasswordReset(email) {
+    if (!email) { alert('メールアドレスを入力してください'); return; }
+    try {
+      await this.auth.sendPasswordResetEmail(email);
+      alert(`${email} にパスワードリセットメールを送信しました。\nメールボックスをご確認ください。`);
+    } catch (e) {
+      alert('送信に失敗しました: ' + this.authErrorMessage(e.code));
+    }
+  },
+
   authErrorMessage(code) {
     const map = {
       'auth/invalid-email':          'メールアドレスの形式が正しくありません',
-      'auth/user-not-found':         'メールアドレスまたはパスワードが違います',
-      'auth/wrong-password':         'メールアドレスまたはパスワードが違います',
-      'auth/invalid-credential':     'メールアドレスまたはパスワードが違います',
+      'auth/user-not-found':              'メールアドレスまたはパスワードが違います',
+      'auth/wrong-password':              'メールアドレスまたはパスワードが違います',
+      'auth/invalid-credential':          'メールアドレスまたはパスワードが違います',
+      'auth/invalid-login-credentials':   'メールアドレスまたはパスワードが違います',
       'auth/email-already-in-use':   'このメールアドレスはすでに登録されています',
       'auth/weak-password':          'パスワードは6文字以上にしてください',
       'auth/too-many-requests':      'しばらく時間をおいてから再試行してください',
@@ -996,6 +1007,12 @@ const App = {
       tabLogin.classList.remove('active');
       btnSubmit.textContent = 'アカウントを作成';
       document.getElementById('auth-error').textContent = '';
+    });
+
+    // パスワードリセット
+    document.getElementById('btn-forgot-password').addEventListener('click', () => {
+      const email = document.getElementById('auth-email').value.trim();
+      this.sendPasswordReset(email);
     });
 
     // 認証フォーム送信
