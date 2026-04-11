@@ -38,6 +38,9 @@ const App = {
     user: null,
     mealPlanUnsub: null,      // Firestoreリスナー解除関数
     confirmCallback: null,
+    dishSelectContext: null,  // { dateKey, mealType, field, dishType }
+    addFromSelectModal: false,// 献立選択モーダルから新規追加フラグ
+    dbSearchQuery: '',        // 献立DBの検索クエリ
   },
   db:      null,
   auth:    null,
@@ -740,6 +743,25 @@ const App = {
         });
       });
 
+      // 日別詳細からの献立編集
+      card.querySelectorAll('[data-action="edit-dish-daily"]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const dish = this.getDish(btn.dataset.id);
+          if (!dish) return;
+          this.state.editReturnToDailyView = true; // 編集後に日別詳細へ戻るフラグ
+          this.openDishModal(dish);
+        });
+      });
+
+      // 日別詳細からの献立選択（DBから）
+      card.querySelectorAll('[data-action="select-dish"]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          this.openDishSelectModal(btn.dataset.date, btn.dataset.mt, btn.dataset.field);
+        });
+      });
+
       container.appendChild(card);
     });
   },
@@ -753,6 +775,8 @@ const App = {
           ${dish ? `data-action="open-recipe" data-id="${dish.id}"` : ''}
         >${dish ? dish.name : '未設定'}</span>
         <div class="dish-row-actions">
+          ${dish ? `<button class="icon-btn icon-btn-sm" data-action="edit-dish-daily" data-id="${dish.id}" title="献立を編集" style="font-size:14px;">✏️</button>` : ''}
+          <button class="icon-btn icon-btn-sm" data-action="select-dish" data-mt="${mt}" data-field="${field}" data-date="${dateKey}" title="DBから選択" style="font-size:14px;">📋</button>
           <button class="icon-btn icon-btn-sm" data-action="dice-dish" data-mt="${mt}" data-field="${field}" title="ランダム変更" style="font-size:14px;">🎲</button>
         </div>
       </div>`;
@@ -764,7 +788,7 @@ const App = {
   renderDbView() {
     const type  = this.state.activeDbType;
     const list  = document.getElementById('dish-list');
-    const dishes = this.state.dishes.filter(d => d.type === type);
+    const q = (this.state.dbSearchQuery || '').trim().toLowerCase();
 
     // タブカウント更新
     document.querySelectorAll('.db-tab').forEach(tab => {
@@ -774,9 +798,14 @@ const App = {
       tab.classList.toggle('active', t === type);
     });
 
+    let dishes = this.state.dishes.filter(d => d.type === type);
+    if (q) {
+      dishes = dishes.filter(d => d.name.toLowerCase().includes(q));
+    }
+
     list.innerHTML = '';
     if (dishes.length === 0) {
-      list.innerHTML = '<p style="text-align:center;color:#aaa;padding:32px;">献立がありません</p>';
+      list.innerHTML = '<p style="text-align:center;color:#aaa;padding:32px;">見つかりません</p>';
       return;
     }
 
@@ -908,10 +937,95 @@ const App = {
 
       await this.saveDish(data, id ? id : dishId, !id);
       this.hideModal('dish-modal');
-      this.renderDbView();
-      this.showSnack(id ? '更新しました' : '追加しました');
+
+      // 献立選択モーダルから新規追加した場合 → その料理を自動選択して日別詳細へ
+      if (this.state.addFromSelectModal && this.state.dishSelectContext) {
+        this.state.addFromSelectModal = false;
+        await this.selectDishFromModal(dishId);
+      // 日別詳細から開いた場合は日別詳細を再描画して戻る
+      } else if (this.state.editReturnToDailyView && this.state.selectedDate) {
+        this.state.editReturnToDailyView = false;
+        this.renderDailyView(this.state.selectedDate);
+        this.showSnack('更新しました');
+      } else {
+        this.renderDbView();
+        this.showSnack(id ? '更新しました' : '追加しました');
+      }
     } catch (err) {
       alert('保存に失敗しました: ' + err.message);
+    } finally {
+      this.showOverlay(false);
+    }
+  },
+
+  // ============================================================
+  // 献立選択モーダル（日別詳細からDBを選ぶ）
+  // ============================================================
+  openDishSelectModal(dateKey, mealType, field) {
+    const dishType = field === 'main' ? 'main' : 'side';
+    this.state.dishSelectContext = { dateKey, mealType, field, dishType };
+
+    const titleLabel = { main: '主菜', side1: '副菜1', side2: '副菜2' };
+    document.getElementById('dish-select-title').textContent =
+      `${titleLabel[field] || '献立'}を選択`;
+    document.getElementById('dish-select-search').value = '';
+
+    this.renderDishSelectList('');
+    this.showModal('dish-select-modal');
+  },
+
+  renderDishSelectList(query) {
+    const ctx = this.state.dishSelectContext;
+    if (!ctx) return;
+
+    const list = document.getElementById('dish-select-list');
+    const q = query.trim().toLowerCase();
+
+    let dishes = this.state.dishes.filter(d => d.type === ctx.dishType);
+    if (q) {
+      dishes = dishes.filter(d => d.name.toLowerCase().includes(q));
+    }
+
+    // 現在選択中の dish を強調
+    const curPlan = (this.state.mealPlan[ctx.dateKey] || {})[ctx.mealType] || {};
+    const curId   = curPlan[ctx.field];
+
+    list.innerHTML = '';
+    if (dishes.length === 0) {
+      list.innerHTML = '<p class="dish-select-empty">見つかりません</p>';
+      return;
+    }
+
+    const MEAL_TIME_BADGE = { morning: '🌅朝', lunch_dinner: '🍱昼・夕', any: '' };
+    dishes.forEach(dish => {
+      const item = document.createElement('div');
+      item.className = 'dish-select-item' + (dish.id === curId ? ' selected' : '');
+      const badgeClass = CATEGORY_BADGE[dish.category] || 'badge-other';
+      const mtBadge = MEAL_TIME_BADGE[dish.mealTime || 'any'];
+      item.innerHTML = `
+        <div class="dish-select-item-name">${dish.name}</div>
+        <div class="dish-select-item-meta">
+          <span class="badge ${badgeClass}">${dish.category || ''}</span>
+          ${mtBadge ? `<span class="badge badge-meal-time">${mtBadge}</span>` : ''}
+        </div>`;
+      item.addEventListener('click', () => this.selectDishFromModal(dish.id));
+      list.appendChild(item);
+    });
+  },
+
+  async selectDishFromModal(dishId) {
+    const ctx = this.state.dishSelectContext;
+    if (!ctx) return;
+    this.showOverlay(true);
+    try {
+      const cur     = (this.state.mealPlan[ctx.dateKey] || {})[ctx.mealType] || {};
+      const updated = { ...cur, [ctx.field]: dishId };
+      await this.saveMeal(ctx.dateKey, ctx.mealType, updated);
+      this.hideModal('dish-select-modal');
+      this.state.dishSelectContext = null;
+      this.showSnack('献立を変更しました');
+    } catch (e) {
+      alert('保存に失敗しました: ' + e.message);
     } finally {
       this.showOverlay(false);
     }
@@ -1106,9 +1220,46 @@ const App = {
         this.renderDbView();
       });
     });
+    // DB検索
+    document.getElementById('db-search-input').addEventListener('input', e => {
+      this.state.dbSearchQuery = e.target.value;
+      this.renderDbView();
+    });
+
+    // 献立選択モーダル
+    document.getElementById('dish-select-modal-overlay').addEventListener('click', () => {
+      this.state.dishSelectContext   = null;
+      this.state.addFromSelectModal  = false;
+      this.hideModal('dish-select-modal');
+    });
+    document.getElementById('dish-select-search').addEventListener('input', e => {
+      this.renderDishSelectList(e.target.value);
+    });
+    document.getElementById('btn-dish-select-add').addEventListener('click', () => {
+      const ctx = this.state.dishSelectContext;
+      if (!ctx) return;
+      this.state.addFromSelectModal = true;
+      this.hideModal('dish-select-modal');
+      this.openDishModal(null);
+      // 種類・食事時間帯をコンテキストに合わせてプリセット
+      document.getElementById('dish-type').value = ctx.dishType;
+      if (ctx.mealType === 'breakfast') {
+        document.getElementById('dish-meal-time').value = 'morning';
+      }
+    });
     document.getElementById('dish-form').addEventListener('submit', e => this.submitDishForm(e));
-    document.getElementById('btn-cancel-dish').addEventListener('click', () => this.hideModal('dish-modal'));
-    document.getElementById('dish-modal-overlay').addEventListener('click', () => this.hideModal('dish-modal'));
+    document.getElementById('btn-cancel-dish').addEventListener('click', () => {
+      this.state.editReturnToDailyView = false;
+      this.state.addFromSelectModal    = false;
+      this.state.dishSelectContext     = null;
+      this.hideModal('dish-modal');
+    });
+    document.getElementById('dish-modal-overlay').addEventListener('click', () => {
+      this.state.editReturnToDailyView = false;
+      this.state.addFromSelectModal    = false;
+      this.state.dishSelectContext     = null;
+      this.hideModal('dish-modal');
+    });
 
     // 画像選択プレビュー
     document.getElementById('dish-image-input').addEventListener('change', e => {

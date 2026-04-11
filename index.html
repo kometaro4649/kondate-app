@@ -125,6 +125,9 @@
         <button class="db-tab active" data-type="main">主菜（50）</button>
         <button class="db-tab" data-type="side">副菜（50）</button>
       </div>
+      <div class="db-search-wrap">
+        <input type="text" id="db-search-input" placeholder="🔍 料理名で検索…" autocomplete="off">
+      </div>
       <div id="dish-list" class="dish-list"></div>
     </div>
 
@@ -300,6 +303,22 @@
         <button id="btn-confirm-ok" class="btn btn-danger">実行</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 献立選択モーダル -->
+<div id="dish-select-modal" class="modal hidden">
+  <div class="modal-overlay" id="dish-select-modal-overlay"></div>
+  <div class="modal-sheet dish-select-sheet">
+    <div class="modal-handle"></div>
+    <div class="dish-select-header">
+      <div class="modal-title" id="dish-select-title">献立を選択</div>
+      <button class="btn btn-primary btn-small" id="btn-dish-select-add">＋ 新規追加</button>
+    </div>
+    <div class="dish-select-search-wrap">
+      <input type="text" id="dish-select-search" placeholder="🔍 料理名で検索…" autocomplete="off">
+    </div>
+    <div id="dish-select-list" class="dish-select-list"></div>
   </div>
 </div>
 
