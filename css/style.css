@@ -75,6 +75,51 @@ html, body {
 .btn-large     { padding: 16px 24px; font-size: 17px; border-radius: 14px; }
 .btn-google    { background: #fff; color: #333; border: 1px solid #ddd; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
 
+/* ===== 認証タブ ===== */
+.auth-tabs {
+  display: flex;
+  background: #f0f0f0;
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 20px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.auth-tab.active {
+  background: #fff;
+  color: #FF6934;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.auth-content .form-group input {
+  padding: 13px 14px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 16px;
+  width: 100%;
+  background: #fff;
+}
+.auth-content .form-group input:focus {
+  outline: none;
+  border-color: #FF6934;
+}
+.auth-error {
+  color: #FF3B30;
+  font-size: 13px;
+  margin-bottom: 10px;
+  min-height: 18px;
+  text-align: left;
+}
+
 /* ===== 世帯設定画面 ===== */
 #household-screen {
   display: flex;
@@ -585,6 +630,69 @@ html, body {
   z-index: 150;
 }
 #overlay-loading.hidden { display: none; }
+
+/* ===== 献立カードサムネイル ===== */
+.dish-card-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* ===== 食事時間帯バッジ ===== */
+.badge-meal-time { background: #f0f8ff; color: #0055cc; }
+
+/* ===== 画像アップロード ===== */
+.image-upload-area {
+  border: 1.5px dashed #ddd;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: #fafafa;
+}
+.dish-image-preview {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.image-upload-label {
+  cursor: pointer;
+  color: #FF6934;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-remove-image {
+  background: none;
+  border: none;
+  color: #FF3B30;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 8px;
+}
+
+/* ===== レシピ詳細モーダル ===== */
+.recipe-modal-image {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.recipe-modal-text {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #333;
+  white-space: pre-wrap;
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 4px;
+}
 
 /* ===== スクロールバー非表示 ===== */
 * { scrollbar-width: none; }

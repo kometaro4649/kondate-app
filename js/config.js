@@ -1,3 +1,4 @@
+// Firebase 設定（compat SDK 用）
 window.firebaseConfig = {
   apiKey: "AIzaSyBJiL26c9nvZNyjKkEcoWHFaZQR2VSxVuQ",
   authDomain: "kometaro-x.firebaseapp.com",

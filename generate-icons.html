@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>アイコン生成ツール</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 20px; background: #f5f5f5; }
+    canvas { border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+    button { padding: 12px 28px; background: #FF6934; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; }
+    button:hover { opacity: 0.85; }
+    p { color: #555; }
+  </style>
+</head>
+<body>
+  <h2>PWA アイコン生成</h2>
+  <p>ボタンを押すと icon-192.png と icon-512.png が自動でダウンロードされます</p>
+  <canvas id="c"></canvas>
+  <button onclick="generate()">アイコンをダウンロード</button>
+
+  <script>
+    function drawIcon(canvas, size) {
+      canvas.width  = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const r   = size * 0.18; // 角丸
+
+      // 背景
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.lineTo(size - r, 0);
+      ctx.quadraticCurveTo(size, 0, size, r);
+      ctx.lineTo(size, size - r);
+      ctx.quadraticCurveTo(size, size, size - r, size);
+      ctx.lineTo(r, size);
+      ctx.quadraticCurveTo(0, size, 0, size - r);
+      ctx.lineTo(0, r);
+      ctx.quadraticCurveTo(0, 0, r, 0);
+      ctx.closePath();
+      ctx.fillStyle = '#FF6934';
+      ctx.fill();
+
+      // 絵文字
+      ctx.font      = `${size * 0.55}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🍱', size / 2, size / 2 + size * 0.03);
+    }
+
+    function generate() {
+      const canvas = document.getElementById('c');
+
+      // 192x192
+      drawIcon(canvas, 192);
+      const a192 = document.createElement('a');
+      a192.download = 'icon-192.png';
+      a192.href = canvas.toDataURL('image/png');
+      a192.click();
+
+      // 少し待ってから 512x512
+      setTimeout(() => {
+        drawIcon(canvas, 512);
+        const a512 = document.createElement('a');
+        a512.download = 'icon-512.png';
+        a512.href = canvas.toDataURL('image/png');
+        a512.click();
+        // プレビュー用に192に戻す
+        drawIcon(canvas, 192);
+      }, 300);
+    }
+
+    // 初期プレビュー
+    drawIcon(document.getElementById('c'), 192);
+  </script>
+</body>
+</html>

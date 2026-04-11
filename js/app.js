@@ -39,8 +39,9 @@ const App = {
     mealPlanUnsub: null,      // Firestoreリスナー解除関数
     confirmCallback: null,
   },
-  db:   null,
-  auth: null,
+  db:      null,
+  auth:    null,
+  storage: null,
 
   // ============================================================
   // 初期化
@@ -48,8 +49,9 @@ const App = {
   async init() {
     try {
       firebase.initializeApp(window.firebaseConfig);
-      this.db   = firebase.firestore();
-      this.auth = firebase.auth();
+      this.db      = firebase.firestore();
+      this.auth    = firebase.auth();
+      this.storage = firebase.storage();
     } catch (e) {
       this.showScreen('auth');
       alert('Firebase設定が見つかりません。js/config.js を確認してください。\n' + e.message);
@@ -86,13 +88,36 @@ const App = {
     }
   },
 
-  async signInWithGoogle() {
-    const provider = new firebase.auth.GoogleAuthProvider();
+  // メール/パスワード認証
+  async signInWithEmail(email, password) {
     try {
-      await this.auth.signInWithPopup(provider);
+      await this.auth.signInWithEmailAndPassword(email, password);
     } catch (e) {
-      if (e.code !== 'auth/popup-closed-by-user') alert('ログインに失敗しました: ' + e.message);
+      return this.authErrorMessage(e.code);
     }
+    return null;
+  },
+
+  async registerWithEmail(email, password) {
+    try {
+      await this.auth.createUserWithEmailAndPassword(email, password);
+    } catch (e) {
+      return this.authErrorMessage(e.code);
+    }
+    return null;
+  },
+
+  authErrorMessage(code) {
+    const map = {
+      'auth/invalid-email':          'メールアドレスの形式が正しくありません',
+      'auth/user-not-found':         'メールアドレスまたはパスワードが違います',
+      'auth/wrong-password':         'メールアドレスまたはパスワードが違います',
+      'auth/invalid-credential':     'メールアドレスまたはパスワードが違います',
+      'auth/email-already-in-use':   'このメールアドレスはすでに登録されています',
+      'auth/weak-password':          'パスワードは6文字以上にしてください',
+      'auth/too-many-requests':      'しばらく時間をおいてから再試行してください',
+    };
+    return map[code] || 'エラーが発生しました: ' + code;
   },
 
   async signOut() {
@@ -236,18 +261,19 @@ const App = {
   // ============================================================
   // 献立DB CRUD
   // ============================================================
-  async saveDish(data, id) {
+  // isNew=true のとき指定 id で新規作成（画像アップロード時に id が先に決まるため）
+  async saveDish(data, id, isNew = false) {
     const colRef = this.db.collection('households').doc(this.state.householdId).collection('dishes');
-    if (id) {
+    if (!isNew && !id) throw new Error('id が必要です');
+    if (isNew) {
+      const doc = { ...data, id, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+      await colRef.doc(id).set(doc);
+      this.state.dishes.push(doc);
+      this.state.dishes.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    } else {
       await colRef.doc(id).update(data);
       const idx = this.state.dishes.findIndex(d => d.id === id);
       if (idx >= 0) this.state.dishes[idx] = { ...this.state.dishes[idx], ...data };
-    } else {
-      const ref = colRef.doc();
-      const doc = { ...data, id: ref.id, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
-      await ref.set(doc);
-      this.state.dishes.push(doc);
-      this.state.dishes.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     }
   },
 
@@ -282,11 +308,25 @@ const App = {
     return ids;
   },
 
-  pickDish(type, excludeIds, filter) {
-    let pool = this.state.dishes.filter(d => d.type === type && !excludeIds.has(d.id));
+  // mealType: 'breakfast' | 'lunch' | 'dinner'
+  pickDish(type, excludeIds, filter, mealType) {
+    const mealTimeOk = d => {
+      const mt = d.mealTime || 'any';
+      if (mt === 'any') return true;
+      if (mealType === 'breakfast') return mt === 'morning';
+      return mt === 'lunch_dinner'; // lunch or dinner
+    };
+
+    let pool = this.state.dishes.filter(d =>
+      d.type === type && !excludeIds.has(d.id) && mealTimeOk(d)
+    );
     if (filter && filter.length > 0) {
       const filtered = pool.filter(d => filter.some(f => (d.ingredients || []).includes(f)));
       if (filtered.length > 0) pool = filtered;
+    }
+    // フォールバック：mealTime 条件を外す
+    if (pool.length === 0) {
+      pool = this.state.dishes.filter(d => d.type === type && !excludeIds.has(d.id));
     }
     if (pool.length === 0) {
       pool = this.state.dishes.filter(d => d.type === type);
@@ -295,12 +335,12 @@ const App = {
   },
 
   // 1食分（主菜・副菜1・副菜2）をランダム生成
-  generateOneMeal(dateKey, excludeMain, excludeSide, filter) {
-    const main  = this.pickDish('main', excludeMain, filter);
+  generateOneMeal(dateKey, excludeMain, excludeSide, filter, mealType) {
+    const main  = this.pickDish('main', excludeMain, filter, mealType);
     const used  = new Set(excludeSide);
-    const side1 = this.pickDish('side', used, []);
+    const side1 = this.pickDish('side', used, [], mealType);
     if (side1) used.add(side1.id);
-    const side2 = this.pickDish('side', used, []);
+    const side2 = this.pickDish('side', used, [], mealType);
     return {
       main:  main  ? main.id  : null,
       side1: side1 ? side1.id : null,
@@ -317,7 +357,7 @@ const App = {
       const meals  = {};
 
       MEAL_TYPES.forEach(mt => {
-        const m = this.generateOneMeal(dateKey, exMain, exSide, filter);
+        const m = this.generateOneMeal(dateKey, exMain, exSide, filter, mt);
         meals[mt] = m;
         if (m.main)  exMain.add(m.main);
         if (m.side1) exSide.add(m.side1);
@@ -338,7 +378,7 @@ const App = {
   async generateOneMealAndSave(dateKey, mealType, filter) {
     const exMain = this.getRecentIds(dateKey, 5, 'main');
     const exSide = this.getRecentIds(dateKey, 3, 'side');
-    const m = this.generateOneMeal(dateKey, exMain, exSide, filter);
+    const m = this.generateOneMeal(dateKey, exMain, exSide, filter, mealType);
     await this.saveMeal(dateKey, mealType, m);
     this.showSnack('献立を変更しました');
   },
@@ -348,7 +388,7 @@ const App = {
     const cur   = (this.state.mealPlan[dateKey] || {})[mealType] || {};
     const exIds = new Set([cur.main, cur.side1, cur.side2].filter(Boolean));
     const type  = dishField === 'main' ? 'main' : 'side';
-    const dish  = this.pickDish(type, exIds, type === 'main' ? filter : []);
+    const dish  = this.pickDish(type, exIds, type === 'main' ? filter : [], mealType);
     if (!dish) return;
     const updated = { ...cur, [dishField]: dish.id };
     await this.saveMeal(dateKey, mealType, updated);
@@ -379,7 +419,7 @@ const App = {
           const meals   = {};
 
           MEAL_TYPES.forEach(mt => {
-            const m = this.generateOneMeal(dateKey, exMain, exSide, []);
+            const m = this.generateOneMeal(dateKey, exMain, exSide, [], mt);
             meals[mt] = m;
             if (m.main)  exMain.add(m.main);
             if (m.side1) exSide.add(m.side1);
@@ -409,6 +449,112 @@ const App = {
         this.showOverlay(false);
       }
     });
+  },
+
+  // ============================================================
+  // Firebase Storage：画像アップロード／削除
+  // ============================================================
+  async uploadDishImage(file, dishId) {
+    const ext  = file.name.split('.').pop().toLowerCase() || 'jpg';
+    const path = `households/${this.state.householdId}/dishes/${dishId}_${Date.now()}.${ext}`;
+    const ref  = this.storage.ref(path);
+    await ref.put(file, { contentType: file.type });
+    return await ref.getDownloadURL();
+  },
+
+  async deleteDishImage(imageUrl) {
+    if (!imageUrl) return;
+    try { await this.storage.refFromURL(imageUrl).delete(); } catch (e) { /* 既に削除済みなら無視 */ }
+  },
+
+  // ============================================================
+  // 献立DB 移行：既存データに mealTime を付与
+  // ============================================================
+  async migrateDishes() {
+    const targets = this.state.dishes.filter(d => !d.mealTime);
+    if (targets.length === 0) { this.showSnack('すでに更新済みです'); return; }
+
+    this.showOverlay(true);
+    try {
+      const colRef = this.db.collection('households').doc(this.state.householdId).collection('dishes');
+      const batch  = this.db.batch();
+      targets.forEach(d => {
+        const mt = MEAL_TIME_MAP[d.name] || 'any';
+        batch.update(colRef.doc(d.id), { mealTime: mt });
+        d.mealTime = mt;
+      });
+      await batch.commit();
+      this.showSnack(`${targets.length}件の献立を更新しました`);
+    } catch (e) {
+      alert('更新に失敗しました: ' + e.message);
+    } finally {
+      this.showOverlay(false);
+    }
+  },
+
+  // ============================================================
+  // 献立DB CSV エクスポート
+  // ============================================================
+  exportDishesCSV() {
+    const MEAL_TIME_LABEL = { morning: '朝向け', lunch_dinner: '昼・夕向け', any: 'いつでも' };
+    const headers = ['料理名','種類','食事時間帯','カテゴリ','食材タグ','レシピURL','レシピ本文','メモ'];
+    const rows = this.state.dishes.map(d => [
+      d.name,
+      d.type === 'main' ? '主菜' : '副菜',
+      MEAL_TIME_LABEL[d.mealTime || 'any'],
+      d.category || '',
+      (d.ingredients || []).join('|'),
+      d.recipeUrl  || '',
+      (d.recipeText || '').replace(/\r?\n/g, '\\n'),
+      d.memo       || '',
+    ]);
+    const escape = v => `"${String(v).replace(/"/g, '""')}"`;
+    const csv    = [headers, ...rows].map(r => r.map(escape).join(',')).join('\r\n');
+    const blob   = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url    = URL.createObjectURL(blob);
+    const a      = document.createElement('a');
+    a.href = url;
+    a.download = `献立DB_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  // ============================================================
+  // レシピ詳細モーダル
+  // ============================================================
+  openRecipeModal(dish) {
+    document.getElementById('recipe-modal-title').textContent = dish.name;
+
+    const img = document.getElementById('recipe-modal-image');
+    if (dish.imageUrl) {
+      img.src = dish.imageUrl;
+      img.classList.remove('hidden');
+    } else {
+      img.classList.add('hidden');
+    }
+
+    const textEl = document.getElementById('recipe-modal-text');
+    if (dish.recipeText && dish.recipeText.trim()) {
+      textEl.textContent = dish.recipeText;
+      textEl.classList.remove('hidden');
+    } else {
+      textEl.textContent = '';
+      textEl.classList.add('hidden');
+    }
+
+    const btnUrl    = document.getElementById('btn-recipe-url');
+    const btnSearch = document.getElementById('btn-recipe-search');
+    if (dish.recipeUrl) {
+      btnUrl.classList.remove('hidden');
+      btnUrl.onclick = () => window.open(dish.recipeUrl, '_blank');
+      btnSearch.classList.add('hidden');
+    } else {
+      btnUrl.classList.add('hidden');
+      btnSearch.classList.remove('hidden');
+      btnSearch.onclick = () => window.open(`https://www.google.com/search?q=レシピ+${encodeURIComponent(dish.name)}`, '_blank');
+    }
+
+    this.showModal('recipe-modal');
   },
 
   // ============================================================
@@ -535,13 +681,12 @@ const App = {
           await this.generateOneDishAndSave(dateKey, btn.dataset.mt, btn.dataset.field, this.state.ingredientFilter);
         });
       });
-      card.querySelectorAll('[data-action="open-dish"]').forEach(el => {
+      card.querySelectorAll('[data-action="open-recipe"]').forEach(el => {
         el.addEventListener('click', e => {
           e.stopPropagation();
           const dish = this.getDish(el.dataset.id);
           if (!dish) return;
-          const url = dish.recipeUrl || `https://www.google.com/search?q=レシピ+${encodeURIComponent(dish.name)}`;
-          window.open(url, '_blank');
+          this.openRecipeModal(dish);
         });
       });
 
@@ -555,7 +700,7 @@ const App = {
       <div class="dish-row">
         <span class="dish-row-label">${label}</span>
         <span class="dish-row-name ${dish ? '' : 'empty'}"
-          ${dish ? `data-action="open-dish" data-id="${dish.id}"` : ''}
+          ${dish ? `data-action="open-recipe" data-id="${dish.id}"` : ''}
         >${dish ? dish.name : '未設定'}</span>
         <div class="dish-row-actions">
           <button class="icon-btn icon-btn-sm" data-action="dice-dish" data-mt="${mt}" data-field="${field}" title="ランダム変更" style="font-size:14px;">🎲</button>
@@ -591,12 +736,17 @@ const App = {
       const badgeClass = CATEGORY_BADGE[dish.category] || 'badge-other';
       const hasMemo = dish.memo && dish.memo.trim();
 
+      const MEAL_TIME_BADGE = { morning: '🌅朝', lunch_dinner: '🍱昼・夕', any: '' };
+      const mealTimeBadge  = MEAL_TIME_BADGE[dish.mealTime || 'any'];
       card.innerHTML = `
+        ${dish.imageUrl ? `<img class="dish-card-thumb" src="${dish.imageUrl}" alt="${dish.name}">` : ''}
         <div class="dish-card-info">
           <div class="dish-card-name">${dish.name}</div>
           <div class="dish-card-meta">
             <span class="badge ${badgeClass}">${dish.category}</span>
-            ${dish.recipeUrl ? '<span class="badge badge-url">レシピあり</span>' : ''}
+            ${mealTimeBadge ? `<span class="badge badge-meal-time">${mealTimeBadge}</span>` : ''}
+            ${dish.recipeUrl  ? '<span class="badge badge-url">URLあり</span>'  : ''}
+            ${dish.recipeText ? '<span class="badge badge-url">レシピあり</span>' : ''}
           </div>
           ${hasMemo ? `<div style="font-size:11px;color:#888;margin-top:3px;">${dish.memo}</div>` : ''}
         </div>
@@ -622,13 +772,32 @@ const App = {
   // 献立追加・編集モーダル
   // ============================================================
   openDishModal(dish) {
-    document.getElementById('dish-modal-title').textContent = dish ? '献立を編集' : '献立を追加';
-    document.getElementById('dish-edit-id').value    = dish ? dish.id   : '';
-    document.getElementById('dish-name').value       = dish ? dish.name : '';
-    document.getElementById('dish-type').value       = dish ? dish.type : 'main';
-    document.getElementById('dish-category').value   = dish ? dish.category : '和食';
-    document.getElementById('dish-recipe-url').value = dish && dish.recipeUrl ? dish.recipeUrl : '';
-    document.getElementById('dish-memo').value       = dish ? (dish.memo || '') : '';
+    document.getElementById('dish-modal-title').textContent  = dish ? '献立を編集' : '献立を追加';
+    document.getElementById('dish-edit-id').value            = dish ? dish.id   : '';
+    document.getElementById('dish-name').value               = dish ? dish.name : '';
+    document.getElementById('dish-type').value               = dish ? dish.type : 'main';
+    document.getElementById('dish-meal-time').value          = dish ? (dish.mealTime || 'any') : 'any';
+    document.getElementById('dish-category').value           = dish ? dish.category : '和食';
+    document.getElementById('dish-recipe-url').value         = dish && dish.recipeUrl  ? dish.recipeUrl  : '';
+    document.getElementById('dish-recipe-text').value        = dish && dish.recipeText ? dish.recipeText : '';
+    document.getElementById('dish-memo').value               = dish ? (dish.memo || '') : '';
+    document.getElementById('dish-image-url-current').value  = dish && dish.imageUrl   ? dish.imageUrl   : '';
+
+    // 画像プレビューリセット
+    const preview   = document.getElementById('dish-image-preview');
+    const removeBtn = document.getElementById('btn-remove-image');
+    const hint      = document.getElementById('image-upload-hint');
+    document.getElementById('dish-image-input').value = '';
+    if (dish && dish.imageUrl) {
+      preview.src = dish.imageUrl;
+      preview.classList.remove('hidden');
+      removeBtn.classList.remove('hidden');
+      hint.textContent = '📷 写真を変更';
+    } else {
+      preview.classList.add('hidden');
+      removeBtn.classList.add('hidden');
+      hint.textContent = '📷 写真を選択';
+    }
 
     // 食材チェック
     const grid = document.getElementById('ingredient-check-grid');
@@ -636,8 +805,8 @@ const App = {
     const selected = dish ? (dish.ingredients || []) : [];
     INGREDIENT_TAGS.forEach(tag => {
       const btn = document.createElement('button');
-      btn.type      = 'button';
-      btn.className = 'ingredient-check' + (selected.includes(tag.id) ? ' checked' : '');
+      btn.type        = 'button';
+      btn.className   = 'ingredient-check' + (selected.includes(tag.id) ? ' checked' : '');
       btn.textContent = tag.label;
       btn.dataset.id  = tag.id;
       btn.addEventListener('click', () => btn.classList.toggle('checked'));
@@ -657,23 +826,42 @@ const App = {
       document.querySelectorAll('#ingredient-check-grid .ingredient-check.checked')
     ).map(b => b.dataset.id);
 
-    const data = {
-      name,
-      type:       document.getElementById('dish-type').value,
-      category:   document.getElementById('dish-category').value,
-      ingredients,
-      recipeUrl:  document.getElementById('dish-recipe-url').value.trim() || null,
-      memo:       document.getElementById('dish-memo').value.trim(),
-    };
-
     this.showOverlay(true);
     try {
-      await this.saveDish(data, id);
+      // 画像処理
+      const imageFile       = document.getElementById('dish-image-input').files[0];
+      const currentImageUrl = document.getElementById('dish-image-url-current').value || null;
+      const removeImage     = document.getElementById('btn-remove-image').dataset.remove === 'true';
+      let imageUrl = currentImageUrl;
+
+      const dishId = id || this.generateId();
+
+      if (removeImage) {
+        await this.deleteDishImage(currentImageUrl);
+        imageUrl = null;
+      } else if (imageFile) {
+        if (currentImageUrl) await this.deleteDishImage(currentImageUrl);
+        imageUrl = await this.uploadDishImage(imageFile, dishId);
+      }
+
+      const data = {
+        name,
+        type:       document.getElementById('dish-type').value,
+        mealTime:   document.getElementById('dish-meal-time').value,
+        category:   document.getElementById('dish-category').value,
+        ingredients,
+        recipeUrl:  document.getElementById('dish-recipe-url').value.trim() || null,
+        recipeText: document.getElementById('dish-recipe-text').value.trim(),
+        imageUrl,
+        memo:       document.getElementById('dish-memo').value.trim(),
+      };
+
+      await this.saveDish(data, id ? id : dishId, !id);
       this.hideModal('dish-modal');
       this.renderDbView();
       this.showSnack(id ? '更新しました' : '追加しました');
-    } catch (e) {
-      alert('保存に失敗しました: ' + e.message);
+    } catch (err) {
+      alert('保存に失敗しました: ' + err.message);
     } finally {
       this.showOverlay(false);
     }
@@ -789,8 +977,45 @@ const App = {
   // イベントリスナー設定
   // ============================================================
   setupEventListeners() {
-    // 認証
-    document.getElementById('btn-google-login').addEventListener('click', () => this.signInWithGoogle());
+    // 認証タブ切り替え
+    let authMode = 'login'; // 'login' | 'register'
+    const tabLogin    = document.getElementById('tab-login');
+    const tabRegister = document.getElementById('tab-register');
+    const btnSubmit   = document.getElementById('btn-auth-submit');
+
+    tabLogin.addEventListener('click', () => {
+      authMode = 'login';
+      tabLogin.classList.add('active');
+      tabRegister.classList.remove('active');
+      btnSubmit.textContent = 'ログイン';
+      document.getElementById('auth-error').textContent = '';
+    });
+    tabRegister.addEventListener('click', () => {
+      authMode = 'register';
+      tabRegister.classList.add('active');
+      tabLogin.classList.remove('active');
+      btnSubmit.textContent = 'アカウントを作成';
+      document.getElementById('auth-error').textContent = '';
+    });
+
+    // 認証フォーム送信
+    document.getElementById('auth-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const email    = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const errEl    = document.getElementById('auth-error');
+      errEl.textContent = '';
+      btnSubmit.disabled = true;
+
+      const err = authMode === 'login'
+        ? await this.signInWithEmail(email, password)
+        : await this.registerWithEmail(email, password);
+
+      if (err) {
+        errEl.textContent = err;
+        btnSubmit.disabled = false;
+      }
+    });
 
     // 世帯
     document.getElementById('btn-create-household').addEventListener('click', () => this.createHousehold());
@@ -829,6 +1054,31 @@ const App = {
     document.getElementById('btn-cancel-dish').addEventListener('click', () => this.hideModal('dish-modal'));
     document.getElementById('dish-modal-overlay').addEventListener('click', () => this.hideModal('dish-modal'));
 
+    // 画像選択プレビュー
+    document.getElementById('dish-image-input').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const preview   = document.getElementById('dish-image-preview');
+      const removeBtn = document.getElementById('btn-remove-image');
+      const hint      = document.getElementById('image-upload-hint');
+      preview.src = URL.createObjectURL(file);
+      preview.classList.remove('hidden');
+      removeBtn.classList.remove('hidden');
+      removeBtn.dataset.remove = 'false';
+      hint.textContent = '📷 写真を変更';
+    });
+    // 画像削除ボタン
+    document.getElementById('btn-remove-image').addEventListener('click', () => {
+      const preview   = document.getElementById('dish-image-preview');
+      const removeBtn = document.getElementById('btn-remove-image');
+      const hint      = document.getElementById('image-upload-hint');
+      document.getElementById('dish-image-input').value = '';
+      preview.classList.add('hidden');
+      removeBtn.classList.add('hidden');
+      removeBtn.dataset.remove = 'true';
+      hint.textContent = '📷 写真を選択';
+    });
+
     // 共有コードモーダル
     document.getElementById('row-share-code').addEventListener('click', () => {
       document.getElementById('share-code-display').textContent = this.state.shareCode || '---';
@@ -854,6 +1104,14 @@ const App = {
       this.hideModal('confirm-modal');
       this.state.confirmCallback = null;
     });
+
+    // レシピモーダル
+    document.getElementById('recipe-modal-overlay').addEventListener('click', () => this.hideModal('recipe-modal'));
+    document.getElementById('btn-close-recipe-modal').addEventListener('click', () => this.hideModal('recipe-modal'));
+
+    // 設定：献立DB移行・CSVエクスポート
+    document.getElementById('row-migrate-dishes').addEventListener('click', () => this.migrateDishes());
+    document.getElementById('row-export-csv').addEventListener('click', () => this.exportDishesCSV());
 
     // ログアウト
     document.getElementById('row-sign-out').addEventListener('click', () => this.signOut());
