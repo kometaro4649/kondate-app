@@ -321,13 +321,15 @@ const App = {
 
   // mealType: 'breakfast' | 'lunch' | 'dinner'
   pickDish(type, excludeIds, filter, mealType) {
+    // 朝食：morning / any のみ許可　昼夕：lunch_dinner / any のみ許可
     const mealTimeOk = d => {
       const mt = d.mealTime || 'any';
       if (mt === 'any') return true;
       if (mealType === 'breakfast') return mt === 'morning';
-      return mt === 'lunch_dinner'; // lunch or dinner
+      return mt === 'lunch_dinner';
     };
 
+    // Step1: mealTime + excludeIds + 食材フィルター
     let pool = this.state.dishes.filter(d =>
       d.type === type && !excludeIds.has(d.id) && mealTimeOk(d)
     );
@@ -335,14 +337,21 @@ const App = {
       const filtered = pool.filter(d => filter.some(f => (d.ingredients || []).includes(f)));
       if (filtered.length > 0) pool = filtered;
     }
-    // フォールバック：mealTime 条件を外す
+
+    // Step2: excludeIds を外す（mealTime は維持）
+    if (pool.length === 0) {
+      pool = this.state.dishes.filter(d => d.type === type && mealTimeOk(d));
+    }
+
+    // Step3: 最終手段 - mealTime も外すが excludeIds は維持（同一食事内の重複防止）
     if (pool.length === 0) {
       pool = this.state.dishes.filter(d => d.type === type && !excludeIds.has(d.id));
     }
     if (pool.length === 0) {
       pool = this.state.dishes.filter(d => d.type === type);
     }
-    return pool[Math.floor(Math.random() * pool.length)] || null;
+
+    return pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
   },
 
   // 1食分（主菜・副菜1・副菜2）をランダム生成
@@ -352,10 +361,20 @@ const App = {
     const side1 = this.pickDish('side', used, [], mealType);
     if (side1) used.add(side1.id);
     const side2 = this.pickDish('side', used, [], mealType);
+
+    // 安全網：副菜1と副菜2が同じになった場合は別を探す
+    let side2Final = side2;
+    if (side2 && side1 && side2.id === side1.id) {
+      const alt = this.state.dishes.filter(d =>
+        d.type === 'side' && d.id !== side1.id && !excludeSide.has(d.id)
+      );
+      side2Final = alt.length > 0 ? alt[Math.floor(Math.random() * alt.length)] : null;
+    }
+
     return {
-      main:  main  ? main.id  : null,
-      side1: side1 ? side1.id : null,
-      side2: side2 ? side2.id : null,
+      main:  main       ? main.id       : null,
+      side1: side1      ? side1.id      : null,
+      side2: side2Final ? side2Final.id : null,
     };
   },
 
@@ -482,20 +501,40 @@ const App = {
   // 献立DB 移行：既存データに mealTime を付与
   // ============================================================
   async migrateDishes() {
-    const targets = this.state.dishes.filter(d => !d.mealTime);
-    if (targets.length === 0) { this.showSnack('すでに更新済みです'); return; }
-
     this.showOverlay(true);
     try {
       const colRef = this.db.collection('households').doc(this.state.householdId).collection('dishes');
       const batch  = this.db.batch();
-      targets.forEach(d => {
+      let count    = 0;
+
+      // ① mealTime が未設定の既存ディッシュに付与
+      const noMealTime = this.state.dishes.filter(d => !d.mealTime);
+      noMealTime.forEach(d => {
         const mt = MEAL_TIME_MAP[d.name] || 'any';
         batch.update(colRef.doc(d.id), { mealTime: mt });
         d.mealTime = mt;
+        count++;
       });
+
+      // ② INITIAL_DISHES にあって Firestore にないものを追加（朝食レシピなど）
+      const existingNames = new Set(this.state.dishes.map(d => d.name));
+      const toAdd = INITIAL_DISHES.filter(d => !existingNames.has(d.name));
+      toAdd.forEach(dish => {
+        const ref = colRef.doc();
+        const doc = { ...dish, id: ref.id, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+        batch.set(ref, doc);
+        this.state.dishes.push(doc);
+        count++;
+      });
+
+      if (count === 0) {
+        this.showSnack('すでに最新の状態です');
+        return;
+      }
+
       await batch.commit();
-      this.showSnack(`${targets.length}件の献立を更新しました`);
+      this.state.dishes.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      this.showSnack(`${count}件を更新・追加しました`);
     } catch (e) {
       alert('更新に失敗しました: ' + e.message);
     } finally {

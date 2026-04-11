@@ -34,6 +34,16 @@ const INITIAL_DISHES = [
   { name: '鮭フレーク丼',           type: 'main', category: '和食', mealTime: 'morning',      ingredients: ['fish'],                   recipeUrl: null, recipeText: '', memo: '' },
   { name: 'アジの干物',             type: 'main', category: '和食', mealTime: 'morning',      ingredients: ['fish'],                   recipeUrl: null, recipeText: '', memo: '' },
   { name: 'トースト',               type: 'main', category: '洋食', mealTime: 'morning',      ingredients: ['dairy'],                  recipeUrl: null, recipeText: '', memo: '' },
+  { name: 'オムレツ',               type: 'main', category: '洋食', mealTime: 'morning',      ingredients: ['egg', 'dairy'],           recipeUrl: null, recipeText: '', memo: '' },
+  { name: 'フレンチトースト',       type: 'main', category: '洋食', mealTime: 'morning',      ingredients: ['egg', 'dairy'],           recipeUrl: null, recipeText: '', memo: '' },
+  { name: '卵かけご飯',             type: 'main', category: '和食', mealTime: 'morning',      ingredients: ['egg'],                    recipeUrl: null, recipeText: '', memo: '' },
+  { name: 'お粥',                   type: 'main', category: '和食', mealTime: 'morning',      ingredients: ['vegetable'],              recipeUrl: null, recipeText: '', memo: '' },
+  { name: 'おにぎり',               type: 'main', category: '和食', mealTime: 'morning',      ingredients: ['seaweed'],                recipeUrl: null, recipeText: '', memo: '' },
+  { name: 'パンケーキ',             type: 'main', category: '洋食', mealTime: 'morning',      ingredients: ['egg', 'dairy'],           recipeUrl: null, recipeText: '', memo: '' },
+  { name: 'サンドイッチ',           type: 'main', category: '洋食', mealTime: 'morning',      ingredients: ['egg'],                    recipeUrl: null, recipeText: '', memo: '' },
+  { name: 'ヨーグルトグラノーラ',   type: 'main', category: '洋食', mealTime: 'morning',      ingredients: ['dairy'],                  recipeUrl: null, recipeText: '', memo: '' },
+  { name: '焼きおにぎり',           type: 'main', category: '和食', mealTime: 'morning',      ingredients: ['seaweed'],                recipeUrl: null, recipeText: '', memo: '' },
+  { name: 'ツナサンド',             type: 'main', category: '洋食', mealTime: 'morning',      ingredients: ['fish'],                   recipeUrl: null, recipeText: '', memo: '' },
 
   // ==================== 主菜（和食・昼夕）====================
   { name: '鮭の塩焼き',             type: 'main', category: '和食', mealTime: 'any',          ingredients: ['fish'],                   recipeUrl: null, recipeText: '', memo: '' },
