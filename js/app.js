@@ -972,6 +972,22 @@ const App = {
 
     this.renderDishSelectList('');
     this.showModal('dish-select-modal');
+
+    // キーボード表示時にシートの高さを visualViewport に合わせて調整
+    const sheet = document.querySelector('.dish-select-sheet');
+    const onVpResize = () => {
+      if (!window.visualViewport) return;
+      const vh = window.visualViewport.height;
+      sheet.style.maxHeight = Math.min(vh * 0.88, vh - 60) + 'px';
+    };
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onVpResize);
+      // モーダルを閉じたらリスナー解除
+      this._dishSelectVpCleanup = () => {
+        window.visualViewport.removeEventListener('resize', onVpResize);
+        sheet.style.maxHeight = '';
+      };
+    }
   },
 
   renderDishSelectList(query) {
@@ -1021,14 +1037,22 @@ const App = {
       const cur     = (this.state.mealPlan[ctx.dateKey] || {})[ctx.mealType] || {};
       const updated = { ...cur, [ctx.field]: dishId };
       await this.saveMeal(ctx.dateKey, ctx.mealType, updated);
-      this.hideModal('dish-select-modal');
-      this.state.dishSelectContext = null;
+      this._closeDishSelectModal();
       this.showSnack('献立を変更しました');
     } catch (e) {
       alert('保存に失敗しました: ' + e.message);
     } finally {
       this.showOverlay(false);
     }
+  },
+
+  _closeDishSelectModal() {
+    if (this._dishSelectVpCleanup) {
+      this._dishSelectVpCleanup();
+      this._dishSelectVpCleanup = null;
+    }
+    this.hideModal('dish-select-modal');
+    this.state.dishSelectContext = null;
   },
 
   // ============================================================
@@ -1228,9 +1252,8 @@ const App = {
 
     // 献立選択モーダル
     document.getElementById('dish-select-modal-overlay').addEventListener('click', () => {
-      this.state.dishSelectContext   = null;
-      this.state.addFromSelectModal  = false;
-      this.hideModal('dish-select-modal');
+      this.state.addFromSelectModal = false;
+      this._closeDishSelectModal();
     });
     document.getElementById('dish-select-search').addEventListener('input', e => {
       this.renderDishSelectList(e.target.value);
@@ -1239,7 +1262,7 @@ const App = {
       const ctx = this.state.dishSelectContext;
       if (!ctx) return;
       this.state.addFromSelectModal = true;
-      this.hideModal('dish-select-modal');
+      this._closeDishSelectModal();
       this.openDishModal(null);
       // 種類・食事時間帯をコンテキストに合わせてプリセット
       document.getElementById('dish-type').value = ctx.dishType;

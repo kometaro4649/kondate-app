@@ -2,11 +2,11 @@ const CACHE_NAME = 'kondate-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/style.css',
-  '/js/config.js',
-  '/js/dishes-data.js',
-  '/js/holidays.js',
-  '/js/app.js',
+  '/css/style.css?v=5',
+  '/js/config.js?v=5',
+  '/js/dishes-data.js?v=5',
+  '/js/holidays.js?v=5',
+  '/js/app.js?v=5',
   '/manifest.json'
 ];
 
@@ -31,6 +31,14 @@ self.addEventListener('fetch', e => {
   if (e.request.url.includes('firebase') || e.request.url.includes('gstatic')) {
     return;
   }
+  // HTML ナビゲーションは常にネットワーク優先（確実に最新版を取得）
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+  // その他はキャッシュ優先
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );

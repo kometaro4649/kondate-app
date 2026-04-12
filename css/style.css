@@ -386,7 +386,12 @@ html, body {
 .meal-header-dinner    { background: #FF6934; }
 
 /* ===== 献立DB ===== */
-#db-view { background: #f5f5f5; }
+#db-view {
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 全体スクロールを無効化 */
+}
 .db-header {
   display: flex;
   align-items: center;
@@ -394,6 +399,7 @@ html, body {
   padding: 14px 16px 8px;
   background: #fff;
   border-bottom: 1px solid #eee;
+  flex-shrink: 0;
 }
 .db-header h2 { font-size: 17px; font-weight: 700; }
 .db-type-tabs {
@@ -401,6 +407,7 @@ html, body {
   background: #fff;
   border-bottom: 1px solid #eee;
   padding: 0 16px;
+  flex-shrink: 0;
 }
 .db-tab {
   flex: 1;
@@ -416,7 +423,16 @@ html, body {
   transition: all 0.15s;
 }
 .db-tab.active { color: #FF6934; border-bottom-color: #FF6934; }
-.dish-list { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.dish-list {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  align-content: flex-start; /* 上詰め */
+}
 .dish-card {
   background: #fff;
   border-radius: 12px;
@@ -711,6 +727,10 @@ html, body {
   flex-direction: column;
   overflow: hidden;
 }
+/* キーボード表示時：input にフォーカスしたら高さを抑える */
+.dish-select-sheet:has(input:focus) {
+  max-height: 46vh;
+}
 .dish-select-header {
   display: flex;
   align-items: center;
@@ -766,6 +786,7 @@ html, body {
   padding: 8px 12px 6px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
 }
 .db-search-wrap input {
   width: 100%;
