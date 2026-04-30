@@ -9,7 +9,7 @@
   <title>献立表</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=5">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
@@ -25,26 +25,10 @@
     <div class="app-logo">🍱</div>
     <h1>献立表</h1>
     <p class="subtitle">家族の食事をスマートに管理</p>
-
-    <!-- ログイン / 新規登録 切り替えタブ -->
-    <div class="auth-tabs">
-      <button class="auth-tab active" id="tab-login">ログイン</button>
-      <button class="auth-tab" id="tab-register">新規登録</button>
-    </div>
-
-    <form id="auth-form" autocomplete="on">
-      <div class="form-group">
-        <input type="email" id="auth-email" placeholder="メールアドレス"
-               autocomplete="email" inputmode="email" required>
-      </div>
-      <div class="form-group">
-        <input type="password" id="auth-password" placeholder="パスワード（6文字以上）"
-               autocomplete="current-password" minlength="6" required>
-      </div>
-      <p id="auth-error" class="auth-error"></p>
-      <button type="submit" id="btn-auth-submit" class="btn btn-primary btn-large">ログイン</button>
-      <button type="button" id="btn-forgot-password" class="btn-forgot">パスワードを忘れた場合</button>
-    </form>
+    <button id="btn-google-login" class="btn btn-large btn-google">
+      <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Googleでログイン
+    </button>
   </div>
 </div>
 
@@ -125,10 +109,130 @@
         <button class="db-tab active" data-type="main">主菜（50）</button>
         <button class="db-tab" data-type="side">副菜（50）</button>
       </div>
-      <div class="db-search-wrap">
-        <input type="text" id="db-search-input" placeholder="🔍 料理名で検索…" autocomplete="off">
-      </div>
       <div id="dish-list" class="dish-list"></div>
+    </div>
+
+    <!-- お気に入り一覧 -->
+    <div id="favorites-view" class="view hidden">
+      <div class="fav-list-header">
+        <input id="fav-search" type="search" class="fav-search" placeholder="料理名で検索…">
+        <div class="fav-filter-bar">
+          <button class="fav-filter-btn active" data-cat="all">全て</button>
+          <button class="fav-filter-btn" data-cat="和食">和食</button>
+          <button class="fav-filter-btn" data-cat="洋食">洋食</button>
+          <button class="fav-filter-btn" data-cat="中華">中華</button>
+          <button class="fav-filter-btn" data-cat="その他">その他</button>
+        </div>
+      </div>
+      <div id="fav-grid" class="fav-grid"></div>
+      <button id="fav-fab" class="fav-fab">＋</button>
+    </div>
+
+    <!-- お気に入り詳細 -->
+    <div id="fav-detail-view" class="view hidden">
+      <div class="fav-detail-header">
+        <button class="btn btn-text" id="fav-detail-btn-back">← 戻る</button>
+      </div>
+      <div class="fav-detail-body">
+        <div id="fav-detail-photo-wrap" class="fav-detail-photo-wrap hidden">
+          <img id="fav-detail-photo" class="fav-detail-photo" src="" alt="">
+        </div>
+        <div class="fav-detail-name-row">
+          <h2 id="fav-detail-name"></h2>
+          <span id="fav-detail-badge" class="badge"></span>
+        </div>
+        <div class="fav-detail-stars" id="fav-detail-stars"></div>
+
+        <div id="fav-detail-recipe-block" class="fav-detail-section hidden">
+          <div class="fav-detail-section-label">レシピURL</div>
+          <a id="fav-detail-recipe-url" href="#" target="_blank" rel="noopener" class="fav-link"></a>
+        </div>
+
+        <div id="fav-detail-manual-block" class="fav-detail-section hidden">
+          <div class="fav-detail-section-label">レシピ</div>
+          <pre id="fav-detail-recipe-text" class="fav-detail-recipe-text"></pre>
+          <button id="fav-detail-btn-fulltext" class="btn btn-secondary btn-small" style="margin-top:8px;">全画面で見る</button>
+        </div>
+
+        <div class="fav-detail-section hidden" id="fav-detail-memo-wrap">
+          <div class="fav-detail-section-label">メモ</div>
+          <p id="fav-detail-memo" class="fav-detail-memo"></p>
+        </div>
+
+        <div class="fav-detail-section hidden" id="fav-detail-tags-wrap">
+          <div class="fav-detail-section-label">食材タグ</div>
+          <div id="fav-detail-tags" class="fav-detail-tags"></div>
+        </div>
+
+        <div class="fav-detail-actions">
+          <button id="fav-detail-btn-edit" class="btn btn-secondary" data-id="">編集</button>
+          <button id="fav-detail-btn-delete" class="btn btn-danger" data-id="">削除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- お気に入り追加・編集フォーム -->
+    <div id="fav-form-view" class="view hidden">
+      <div class="fav-form-header">
+        <button id="fav-form-btn-cancel" class="btn btn-text">← 戻る</button>
+        <h2 id="fav-form-title">レシピを追加</h2>
+      </div>
+      <div class="fav-form-body">
+        <form id="fav-form">
+          <input type="hidden" id="fav-edit-id">
+          <div class="form-group">
+            <label>料理名 *</label>
+            <input type="text" id="fav-form-name" placeholder="例：鶏の唐揚げ" required>
+          </div>
+          <div class="form-group">
+            <label>写真</label>
+            <input type="file" id="fav-form-photo" accept="image/*" style="display:none;">
+            <button type="button" id="fav-form-btn-photo" class="btn btn-secondary btn-small" style="width:auto;">写真を選択</button>
+            <div id="fav-photo-preview-wrap" class="fav-photo-preview-wrap hidden">
+              <img id="fav-photo-preview" class="fav-photo-preview" src="" alt="">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>カテゴリ</label>
+            <div class="fav-cat-row">
+              <button type="button" class="fav-cat-btn active" data-cat="和食">和食</button>
+              <button type="button" class="fav-cat-btn" data-cat="洋食">洋食</button>
+              <button type="button" class="fav-cat-btn" data-cat="中華">中華</button>
+              <button type="button" class="fav-cat-btn" data-cat="その他">その他</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>レシピURL</label>
+            <input type="url" id="fav-form-recipe-url" placeholder="https://...">
+          </div>
+          <div class="form-group">
+            <label>レシピ手動入力</label>
+            <textarea id="fav-form-recipe-text" rows="5" placeholder="材料・手順など自由に記入"></textarea>
+          </div>
+          <div class="form-group">
+            <label>★ 評価</label>
+            <div class="fav-star-row">
+              <button type="button" class="fav-star-input" data-star="1">★</button>
+              <button type="button" class="fav-star-input" data-star="2">★</button>
+              <button type="button" class="fav-star-input" data-star="3">★</button>
+              <button type="button" class="fav-star-input" data-star="4">★</button>
+              <button type="button" class="fav-star-input" data-star="5">★</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>メモ</label>
+            <input type="text" id="fav-form-memo" placeholder="短いメモ（任意）">
+          </div>
+          <div class="form-group">
+            <label>食材タグ</label>
+            <div id="fav-ing-grid" class="ingredient-check-grid"></div>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="fav-form-btn-cancel2" class="btn btn-secondary">キャンセル</button>
+            <button type="submit" class="btn btn-primary">保存</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- 設定 -->
@@ -148,17 +252,6 @@
           <span class="settings-row-label" style="color:#FF3B30;">ログアウト</span>
         </div>
       </div>
-      <div class="settings-section-title" style="padding:0 16px 6px;font-size:12px;color:#888;font-weight:600;">献立DB</div>
-      <div class="settings-section">
-        <div class="settings-row" id="row-migrate-dishes" style="cursor:pointer;">
-          <span class="settings-row-label">食事時間帯タグを更新</span>
-          <span style="color:#aaa;font-size:18px;">›</span>
-        </div>
-        <div class="settings-row" id="row-export-csv" style="cursor:pointer;">
-          <span class="settings-row-label">献立DBをCSV書き出し</span>
-          <span style="color:#aaa;font-size:18px;">›</span>
-        </div>
-      </div>
     </div>
 
   </div>
@@ -168,6 +261,10 @@
     <button class="nav-btn active" data-view="monthly">
       <span class="nav-icon">📅</span>
       <span class="nav-label">献立表</span>
+    </button>
+    <button class="nav-btn" data-view="favorites">
+      <span class="nav-icon">★</span>
+      <span class="nav-label">お気に入り</span>
     </button>
     <button class="nav-btn" data-view="db">
       <span class="nav-icon">📖</span>
@@ -190,7 +287,6 @@
     <div class="modal-body">
       <form id="dish-form">
         <input type="hidden" id="dish-edit-id">
-        <input type="hidden" id="dish-image-url-current">
         <div class="form-group">
           <label>料理名 *</label>
           <input type="text" id="dish-name" placeholder="例：鮭の塩焼き" required>
@@ -200,14 +296,6 @@
           <select id="dish-type">
             <option value="main">主菜</option>
             <option value="side">副菜</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>食事の時間帯</label>
-          <select id="dish-meal-time">
-            <option value="any">いつでも</option>
-            <option value="morning">朝向け</option>
-            <option value="lunch_dinner">昼・夕向け</option>
           </select>
         </div>
         <div class="form-group">
@@ -224,23 +312,8 @@
           <div id="ingredient-check-grid" class="ingredient-check-grid"></div>
         </div>
         <div class="form-group">
-          <label>レシピURL（外部サイト）</label>
+          <label>レシピURL</label>
           <input type="url" id="dish-recipe-url" placeholder="https://...">
-        </div>
-        <div class="form-group">
-          <label>レシピ本文（直接入力）</label>
-          <textarea id="dish-recipe-text" rows="5" placeholder="材料や手順をここに入力…"></textarea>
-        </div>
-        <div class="form-group">
-          <label>料理の写真</label>
-          <div class="image-upload-area" id="image-upload-area">
-            <img id="dish-image-preview" class="dish-image-preview hidden" alt="プレビュー">
-            <label class="image-upload-label" id="image-upload-label" for="dish-image-input">
-              <span id="image-upload-hint">📷 写真を選択</span>
-            </label>
-            <input type="file" id="dish-image-input" accept="image/*" style="display:none;">
-            <button type="button" id="btn-remove-image" class="btn-remove-image hidden">✕ 写真を削除</button>
-          </div>
         </div>
         <div class="form-group">
           <label>メモ</label>
@@ -251,24 +324,6 @@
           <button type="submit" class="btn btn-primary">保存</button>
         </div>
       </form>
-    </div>
-  </div>
-</div>
-
-<!-- レシピ詳細モーダル -->
-<div id="recipe-modal" class="modal hidden">
-  <div class="modal-overlay" id="recipe-modal-overlay"></div>
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="recipe-modal-title"></div>
-    <div class="modal-body">
-      <img id="recipe-modal-image" class="recipe-modal-image hidden" alt="">
-      <div id="recipe-modal-text" class="recipe-modal-text"></div>
-      <div class="form-actions" style="margin-top:16px;">
-        <button id="btn-recipe-search" class="btn btn-secondary hidden">🔍 検索</button>
-        <button id="btn-recipe-url" class="btn btn-primary hidden">🔗 レシピサイトへ</button>
-        <button id="btn-close-recipe-modal" class="btn btn-secondary">閉じる</button>
-      </div>
     </div>
   </div>
 </div>
@@ -306,19 +361,26 @@
   </div>
 </div>
 
-<!-- 献立選択モーダル -->
-<div id="dish-select-modal" class="modal hidden">
-  <div class="modal-overlay" id="dish-select-modal-overlay"></div>
-  <div class="modal-sheet dish-select-sheet">
+<!-- 写真拡大モーダル -->
+<div id="fav-photo-modal" class="fav-photo-modal hidden">
+  <div id="fav-photo-modal-overlay" class="fav-photo-modal-overlay"></div>
+  <div class="fav-photo-modal-inner">
+    <img id="fav-photo-modal-img" src="" alt="">
+  </div>
+</div>
+
+<!-- レシピ全画面モーダル -->
+<div id="fav-fulltext-modal" class="modal hidden">
+  <div id="fav-fulltext-modal-overlay" class="modal-overlay"></div>
+  <div class="modal-sheet fav-fulltext-sheet">
     <div class="modal-handle"></div>
-    <div class="dish-select-header">
-      <div class="modal-title" id="dish-select-title">献立を選択</div>
-      <button class="btn btn-primary btn-small" id="btn-dish-select-add">＋ 新規追加</button>
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:20px;">
+      レシピ
+      <button id="fav-fulltext-close" class="btn btn-text btn-small" style="width:auto;">閉じる</button>
     </div>
-    <div class="dish-select-search-wrap">
-      <input type="text" id="dish-select-search" placeholder="🔍 料理名で検索…" autocomplete="off">
+    <div class="modal-body">
+      <pre id="fav-fulltext-content" class="fav-fulltext-content"></pre>
     </div>
-    <div id="dish-select-list" class="dish-select-list"></div>
   </div>
 </div>
 
@@ -337,10 +399,11 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <!-- アプリスクリプト -->
-<script src="js/config.js?v=5"></script>
-<script src="js/dishes-data.js?v=5"></script>
-<script src="js/holidays.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/config.js"></script>
+<script src="js/dishes-data.js"></script>
+<script src="js/holidays.js"></script>
+<script src="js/app.js"></script>
+<script src="js/favorites.js"></script>
 
 </body>
 </html>
