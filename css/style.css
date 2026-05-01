@@ -722,14 +722,11 @@ html, body {
 
 /* ===== 献立選択モーダル ===== */
 .dish-select-sheet {
-  max-height: 88vh;
+  height: 40vh;          /* 固定高さ：結果数によって変化しない */
+  max-height: 40vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-/* キーボード表示時：input にフォーカスしたら高さを抑える */
-.dish-select-sheet:has(input:focus) {
-  max-height: 46vh;
 }
 .dish-select-header {
   display: flex;
@@ -748,7 +745,7 @@ html, body {
   padding: 9px 12px;
   border: 1.5px solid #e0e0e0;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 16px; /* iOS自動ズーム防止 */
   background: #f9f9f9;
   color: #2d2d2d;
 }
@@ -781,9 +778,37 @@ html, body {
 .dish-select-item-meta { display: flex; gap: 6px; flex-wrap: wrap; }
 .dish-select-empty { text-align: center; color: #aaa; padding: 32px; }
 
+/* ===== 献立DB 食事時間帯フィルター ===== */
+.db-mealtime-filter {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 6px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+.db-mealtime-btn {
+  flex: 1;
+  padding: 6px 4px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.db-mealtime-btn.active {
+  background: #FF6934;
+  border-color: #FF6934;
+  color: #fff;
+}
+
 /* ===== 献立DB 検索バー ===== */
 .db-search-wrap {
-  padding: 8px 12px 6px;
+  padding: 6px 12px 8px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
   flex-shrink: 0;
@@ -793,7 +818,7 @@ html, body {
   padding: 8px 12px;
   border: 1.5px solid #e0e0e0;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 16px; /* iOS自動ズーム防止 */
   background: #f9f9f9;
   color: #2d2d2d;
 }
@@ -801,6 +826,65 @@ html, body {
   outline: none;
   border-color: #FF6934;
   background: #fff;
+}
+
+/* ===== 献立アクションモーダル ===== */
+.dish-action-sheet { padding-bottom: env(safe-area-inset-bottom); }
+.dish-action-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1c1c1e;
+  padding: 12px 20px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.dish-action-btns {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0 4px;
+}
+.dish-action-btn {
+  width: 100%;
+  padding: 15px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #f5f5f5;
+  font-size: 16px;
+  color: #1c1c1e;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.1s;
+}
+.dish-action-btn:active { background: #f5f5f5; }
+.dish-action-close-btn { color: #888; margin-top: 4px; border-top: 4px solid #f5f5f5; border-bottom: none; }
+
+/* 手動入力フォーム */
+.dish-action-custom-wrap { padding: 16px 20px 8px; }
+.dish-action-custom-wrap input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 16px; /* iOS自動ズーム防止 */
+  background: #f9f9f9;
+  color: #2d2d2d;
+  margin-bottom: 12px;
+}
+.dish-action-custom-wrap input:focus {
+  outline: none;
+  border-color: #FF6934;
+  background: #fff;
+}
+.dish-action-custom-actions {
+  display: flex;
+  gap: 10px;
+}
+.dish-action-custom-actions .btn { flex: 1; }
+
+/* カスタム（手動入力）料理名のスタイル */
+.dish-row-name.custom-dish {
+  font-style: italic;
+  color: #888;
 }
 
 /* ===== スクロールバー非表示 ===== */
