@@ -23,9 +23,13 @@ const Favorites = {
   },
 
   async load() {
-    const snap = await this.colRef().orderBy('createdAt', 'desc').get().catch(() => {
-      return this.colRef().get();
-    });
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('お気に入りの読み込みタイムアウト')), 10000)
+    );
+    const snap = await Promise.race([
+      this.colRef().orderBy('createdAt', 'desc').get().catch(() => this.colRef().get()),
+      timeout,
+    ]);
     this.state.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   },
 
@@ -44,9 +48,9 @@ const Favorites = {
 
   async remove(id) {
     const item = this.state.items.find(i => i.id === id);
-    if (item && item.photoUrl) {
+    if (item && item.photoUrl && this.storage) {
       try {
-        const photoRef = firebase.storage().refFromURL(item.photoUrl);
+        const photoRef = this.storage.refFromURL(item.photoUrl);
         await photoRef.delete();
       } catch (_) {}
     }
@@ -55,9 +59,10 @@ const Favorites = {
   },
 
   async uploadPhoto(file, recipeId) {
+    if (!this.storage) throw new Error('Storage が初期化されていません');
     const ext = file.name.split('.').pop();
     const path = `favorites/${this.householdId}/${recipeId}/${Date.now()}.${ext}`;
-    const ref = firebase.storage().ref(path);
+    const ref = this.storage.ref(path);
     const snap = await ref.put(file);
     return await snap.ref.getDownloadURL();
   },
